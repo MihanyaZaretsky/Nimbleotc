@@ -5,5 +5,9 @@
     "ton": "^13.9.0",
     "tonweb": "^0.0.66",
     "tweetnacl": "^1.0.3"
+  },
+  "scripts": {
+    "build": "echo 'no build step'",
+    "start": "node server.js"
   }
 }
