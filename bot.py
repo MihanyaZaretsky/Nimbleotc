@@ -18,7 +18,10 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from fragment_api_lib.client import FragmentAPIClient
+try:
+    from fragment_api_lib.client import FragmentAPIClient
+except Exception:
+    FragmentAPIClient = None
 from aiogram.fsm.storage.memory import MemoryStorage
 # Удаляю все импорты tontools и связанные функции
 
@@ -374,16 +377,19 @@ async def handle_check_rub_payment(callback_query: types.CallbackQuery, state: F
         info = check_crystalpay_invoice(invoice_id)
         state_ = info.get("state")
         if state_ == "payed":
-            try:
-                client = FragmentAPIClient()
-                res = client.buy_stars_without_kyc(
-                    username=username,
-                    amount=amount,
-                    seed=STARS_SEED
-                )
-                await callback_query.message.answer(f"Звёзды успешно куплены и отправлены на аккаунт @{username} через Fragment!")
-            except Exception as e:
-                await callback_query.message.answer(f"Ошибка при покупке звёзд через Fragment: {e}")
+            if FragmentAPIClient is not None:
+                try:
+                    client = FragmentAPIClient()
+                    res = client.buy_stars_without_kyc(
+                        username=username,
+                        amount=amount,
+                        seed=STARS_SEED
+                    )
+                    await callback_query.message.answer(f"Звёзды успешно куплены и отправлены на аккаунт @{username} через Fragment!")
+                except Exception as e:
+                    await callback_query.message.answer(f"Ошибка при покупке звёзд через Fragment: {e}")
+            else:
+                await callback_query.message.answer("Покупка звёзд временно недоступна: модуль fragment_api_lib не установлен на сервере.")
             await state.clear()  # Очищаем только после успешной оплаты
         elif state_ == "expired":
             await callback_query.message.answer("Счёт просрочен. Попробуйте создать новый.")
