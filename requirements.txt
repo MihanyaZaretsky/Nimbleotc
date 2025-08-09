@@ -3,3 +3,5 @@ pytonapi
 ton 
 pytonlib 
 tonsdk 
+requests
+lxml

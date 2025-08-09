@@ -4,7 +4,10 @@ from aiogram import types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from fragment_api_lib.client import FragmentAPIClient
+try:
+    from fragment_api_lib.client import FragmentAPIClient
+except Exception:
+    FragmentAPIClient = None
 import random, string
 from lxml import html
 import time
@@ -129,16 +132,19 @@ async def stars_payment_watcher(bot, deals_db):
                     total_amount = int(float(deal.get("total_to_pay", 0)) * 1e9)
                     buyer_id = deal.get("user_id")
                     if memo == expected_memo and value == total_amount:
-                        try:
-                            client = FragmentAPIClient()
-                            res = client.buy_stars_without_kyc(
-                                username=deal["username"],
-                                amount=deal["amount"],
-                                seed=STARS_SEED
-                            )
-                            await bot.send_message(buyer_id, f"Звёзды успешно куплены и отправлены на ваш аккаунт @{deal['username']}!")
-                        except Exception as e:
-                            await bot.send_message(buyer_id, f"Ошибка при покупке звёзд: {e}")
+                        if FragmentAPIClient is not None:
+                            try:
+                                client = FragmentAPIClient()
+                                res = client.buy_stars_without_kyc(
+                                    username=deal["username"],
+                                    amount=deal["amount"],
+                                    seed=STARS_SEED
+                                )
+                                await bot.send_message(buyer_id, f"Звёзды успешно куплены и отправлены на ваш аккаунт @{deal['username']}!")
+                            except Exception as e:
+                                await bot.send_message(buyer_id, f"Ошибка при покупке звёзд: {e}")
+                        else:
+                            await bot.send_message(buyer_id, "Покупка звёзд временно недоступна: модуль fragment_api_lib не установлен на сервере.")
                         processed_deals.add(deal_id)
                         break
         except Exception as e:
