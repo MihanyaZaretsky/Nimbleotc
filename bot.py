@@ -555,7 +555,8 @@ def send_ton_external(seed_phrase, to_address, amount_ton):
 
 
 def send_ton_via_js_api(to_address, amount, comment=""):
-    base_url = os.environ.get("TON_API_URL", "http://localhost:3000").rstrip("/")
+    # Используем внутренний URL Railway для Node.js сервера
+    base_url = os.environ.get("TON_API_URL", "http://nimbleotc.railway.internal").rstrip("/")
     url = f"{base_url}/send"
     data = {"to": to_address, "amount": amount, "comment": comment}
     try:
