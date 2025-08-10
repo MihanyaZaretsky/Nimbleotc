@@ -549,13 +549,14 @@ def send_ton_external(seed_phrase, to_address, amount_ton):
 
 
 def send_ton_via_js_api(to_address, amount, comment=""):
-    url = "http://localhost:3000/send"
+    base_url = os.environ.get("TON_API_URL", "http://localhost:3000").rstrip("/")
+    url = f"{base_url}/send"
     data = {"to": to_address, "amount": amount, "comment": comment}
     try:
         response = requests.post(url, json=data, timeout=30)
         return response.json()
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "error": str(e), "url": url}
 
 # Пример вызова (замени на реальный вызов в нужном месте):
 # result = send_ton_via_js_api("UQ...", 0.1, "Test from Python bot")
