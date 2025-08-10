@@ -9,6 +9,8 @@ import subprocess
 import time
 import sqlite3
 import random
+import html
+import re
 
 from buy_stars import handle_buy_stars_callback, BuyStarsStates, process_stars_purchase_input, stars_payment_watcher, STARS_WALLET, set_stars_price, STARS_SEED
 from aiogram import Bot, Dispatcher, types
@@ -347,12 +349,14 @@ async def process_rub_method(callback_query: types.CallbackQuery, state: FSMCont
             required_method=method
         )
         if invoice.get("error"):
-            await callback_query.message.answer(f"Ошибка при создании счёта: {invoice.get('errors')}")
+            error_msg = clean_error_message(invoice.get("errors"))
+            await callback_query.message.answer(f"Ошибка при создании счёта: {error_msg}")
             return
         url = invoice["url"]
         invoice_id = invoice["id"]
     except Exception as e:
-        await callback_query.message.answer(f"Ошибка при создании счёта: {e}")
+        error_msg = clean_error_message(str(e))
+        await callback_query.message.answer(f"Ошибка при создании счёта: {error_msg}")
         return
     await state.update_data(rub_invoice_id=invoice_id, rub_username=username, rub_amount=amount)
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -387,7 +391,8 @@ async def handle_check_rub_payment(callback_query: types.CallbackQuery, state: F
                     )
                     await callback_query.message.answer(f"Звёзды успешно куплены и отправлены на аккаунт @{username} через Fragment!")
                 except Exception as e:
-                    await callback_query.message.answer(f"Ошибка при покупке звёзд через Fragment: {e}")
+                    error_msg = clean_error_message(str(e))
+                    await callback_query.message.answer(f"Ошибка при покупке звёзд через Fragment: {error_msg}")
             else:
                 await callback_query.message.answer("Покупка звёзд временно недоступна: модуль fragment_api_lib не установлен на сервере.")
             await state.clear()  # Очищаем только после успешной оплаты
@@ -396,7 +401,8 @@ async def handle_check_rub_payment(callback_query: types.CallbackQuery, state: F
         else:
             await callback_query.message.answer("Оплата ещё не поступила. Проверьте позже.")
     except Exception as e:
-        await callback_query.message.answer(f"Ошибка при проверке оплаты: {e}")
+        error_msg = clean_error_message(str(e))
+        await callback_query.message.answer(f"Ошибка при проверке оплаты: {error_msg}")
 
 # --- Регистрация новых хендлеров ---
 # dp.callback_query.register(start_buy_stars_rub, lambda c: c.data == "buy_stars_rub")
@@ -780,9 +786,11 @@ async def handle_buyer_received_callback(callback_query: types.CallbackQuery) ->
         if result.get("ok"):
             await callback_query.bot.send_message(seller_id, f"Сделка #{deal_id} завершена! Поздравляем!\n\nВам отправлено {payout} TON на кошелёк {seller_wallet}.")
         else:
-            await callback_query.bot.send_message(seller_id, f"Ошибка при выплате: {result}")
+            error_msg = clean_error_message(result.get("error", str(result)))
+            await callback_query.bot.send_message(seller_id, f"Ошибка при выплате: {error_msg}")
     except Exception as e:
-        await callback_query.bot.send_message(seller_id, f"Ошибка при выплате: {e}")
+        error_msg = clean_error_message(str(e))
+        await callback_query.bot.send_message(seller_id, f"Ошибка при выплате: {error_msg}")
     try:
         await callback_query.bot.send_message(buyer_id, f"Сделка #{deal_id} завершена! Поздравляем!")
     except Exception:
@@ -1157,6 +1165,22 @@ def get_main_keyboard(user_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=get_text(user_id, "language_btn"), callback_data="language"), InlineKeyboardButton(text=get_text(user_id, "support_btn"), callback_data="support")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def clean_error_message(error_msg):
+    """Очищает сообщение об ошибке от HTML-тегов и экранирует специальные символы"""
+    if not error_msg:
+        return "Неизвестная ошибка"
+    
+    # Убираем HTML-теги
+    clean_msg = re.sub(r'<[^>]+>', '', str(error_msg))
+    # Экранируем специальные символы для Telegram
+    clean_msg = html.escape(clean_msg)
+    # Ограничиваем длину
+    if len(clean_msg) > 1000:
+        clean_msg = clean_msg[:997] + "..."
+    
+    return clean_msg
 
 
 if __name__ == "__main__":
