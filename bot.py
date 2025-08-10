@@ -1092,6 +1092,110 @@ async def debug_callback(callback_query: types.CallbackQuery, state: FSMContext)
     print(f"DEBUG: callback_data={callback_query.data}")
     await callback_query.answer("DEBUG!", show_alert=True)
 
+# --- РУЛЕТКА С АНИМАЦИЕЙ ---
+async def start_roulette(callback_query: types.CallbackQuery):
+    """Запускает анимацию рулетки на 10 секунд с замедлением"""
+    await callback_query.answer()
+    
+    # Проверяем, какой callback_data был нажат
+    if callback_query.data == "start_roulette":
+        # Первый запуск рулетки
+        roulette_text = "🎰 **РУЛЕТКА** 🎰\n\n🎲 Нажмите кнопку чтобы начать!"
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎰 Крутить рулетку", callback_data="spin_roulette")]
+        ])
+        
+        message = await callback_query.message.edit_text(
+            roulette_text, 
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+    elif callback_query.data == "spin_roulette":
+        # Запуск анимации
+        roulette_text = "🎰 **РУЛЕТКА** 🎰\n\n🎲 Крутится..."
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+        
+        message = await callback_query.message.edit_text(
+            roulette_text, 
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        
+        # Запускаем анимацию рулетки
+        await animate_roulette(message)
+
+async def animate_roulette(message: types.Message):
+    """Анимация рулетки с замедлением"""
+    symbols = ["🍎", "🍊", "🍇", "🍓", "🍒", "🍑", "🥝", "🥭", "🍍", "🥥", "🍌", "🍉"]
+    current_symbols = random.choices(symbols, k=3)
+    
+    # Начальная скорость (быстро)
+    initial_delay = 0.1
+    # Конечная скорость (медленно)
+    final_delay = 1.0
+    # Общее время анимации
+    total_time = 10.0
+    
+    start_time = time.time()
+    iteration = 0
+    
+    while True:
+        current_time = time.time()
+        elapsed = current_time - start_time
+        
+        if elapsed >= total_time:
+            break
+            
+        # Вычисляем текущую задержку с замедлением
+        progress = elapsed / total_time
+        current_delay = initial_delay + (final_delay - initial_delay) * progress
+        
+        # Обновляем символы
+        current_symbols = random.choices(symbols, k=3)
+        
+        # Формируем текст рулетки
+        roulette_text = f"🎰 **РУЛЕТКА** 🎰\n\n"
+        roulette_text += f"🎲 Крутится... {elapsed:.1f}s\n\n"
+        roulette_text += f"🎯 Результат: {' | '.join(current_symbols)}\n\n"
+        
+        # Добавляем прогресс-бар
+        progress_bars = int(progress * 20)
+        roulette_text += f"📊 Прогресс: {'█' * progress_bars}{'░' * (20 - progress_bars)}\n"
+        roulette_text += f"⏱️ Осталось: {total_time - elapsed:.1f}s"
+        
+        try:
+            await message.edit_text(
+                roulette_text,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception:
+            # Если сообщение не может быть отредактировано, прерываем анимацию
+            break
+        
+        iteration += 1
+        await asyncio.sleep(current_delay)
+    
+    # Финальный результат
+    final_symbols = random.choices(symbols, k=3)
+    final_text = f"🎰 **РУЛЕТКА ЗАВЕРШЕНА!** 🎰\n\n"
+    final_text += f"🎯 Финальный результат: {' | '.join(final_symbols)}\n\n"
+    final_text += f"🎉 Поздравляем! Вы выиграли приз!\n\n"
+    final_text += f"🔄 Нажмите кнопку ниже для нового круга"
+    
+    final_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎰 Крутить снова", callback_data="spin_roulette")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main_menu")]
+    ])
+    
+    try:
+        await message.edit_text(
+            final_text,
+            reply_markup=final_keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+    except Exception:
+        pass
+
 async def main() -> None:
     """Starts the bot."""
     init_db()
@@ -1144,6 +1248,9 @@ async def main() -> None:
     dp.callback_query.register(start_buy_stars_rub, lambda c: c.data == "buy_stars_rub") # Оставлен только новый FSM-обработчик
     dp.callback_query.register(process_rub_method, lambda c: c.data.startswith("rub_method_"))
     dp.callback_query.register(handle_check_rub_payment, lambda c: c.data == "check_rub_payment") # Удален обработчик проверки оплаты
+    # Обработчики для рулетки
+    dp.callback_query.register(start_roulette, lambda c: c.data == "start_roulette")
+    dp.callback_query.register(start_roulette, lambda c: c.data == "spin_roulette")
     dp.message.register(process_stars_amount, BuyStarsRubStates.waiting_for_amount)
     dp.message.register(process_stars_username, BuyStarsRubStates.waiting_for_username)
     dp.message.register(stars_purchase_input_wrapper, BuyStarsStates.waiting_for_stars_purchase_input)
@@ -1162,6 +1269,7 @@ def get_main_keyboard(user_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=get_text(user_id, "create_deal_btn"), callback_data="create_deal")],
         [InlineKeyboardButton(text=get_text(user_id, "wallet_btn"), callback_data="wallet")],
         [InlineKeyboardButton(text="⭐️ Купить звёзды", callback_data="buy_stars")],
+        [InlineKeyboardButton(text="🎰 Рулетка", callback_data="start_roulette")],
         [InlineKeyboardButton(text=get_text(user_id, "referrals_btn"), callback_data="partners")],
         [InlineKeyboardButton(text=get_text(user_id, "language_btn"), callback_data="language"), InlineKeyboardButton(text=get_text(user_id, "support_btn"), callback_data="support")],
     ]
